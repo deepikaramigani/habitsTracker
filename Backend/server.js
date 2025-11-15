@@ -24,21 +24,42 @@ const allowedOrigins = [
   process.env.PREVIEW_FRONTEND_URL,
 ].filter(Boolean);
 
+// Request logging middleware (before CORS)
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} | Origin: ${req.get('origin') || 'none'}`);
+  next();
+});
+
+// CORS Configuration
 app.use(cors({
   origin: (origin, callback) => {
+    console.log(`  CORS check: origin="${origin}", allowed=${allowedOrigins.includes(origin)}`);
     // Allow requests with no origin (e.g., curl, server-to-server)
     if (!origin) return callback(null, true);
     if (allowedOrigins.includes(origin)) return callback(null, true);
     // Not allowed
-    return callback(new Error('CORS origin denied'));
+    const err = new Error('CORS origin denied');
+    return callback(err);
   },
   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
   credentials: true,
+  preflightContinue: false,
 }));
 
 console.log('CORS allowed origins:', allowedOrigins.length ? allowedOrigins : 'none (will allow server-to-server requests only)');
 
 app.use(express.json());
+
+// Request body logging middleware
+app.use((req, res, next) => {
+  if (req.method !== 'OPTIONS' && req.body && Object.keys(req.body).length > 0) {
+    console.log(`  Body:`, JSON.stringify(req.body));
+  }
+  res.on('finish', () => {
+    console.log(`  Response: ${res.statusCode}`);
+  });
+  next();
+});
 
 // API Routes
 app.use("/api/users", userRoutes);
@@ -47,7 +68,14 @@ app.use("/api/checkins", checkinRoutes);
 
 // Fallback for unknown routes (Express 5)
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found" });
+  console.error(`[404] Route not found: ${req.method} ${req.path}`);
+  res.status(404).json({ message: "Route not found", path: req.path, method: req.method });
+});
+
+// Error handler
+app.use((err, req, res, next) => {
+  console.error(`[ERROR] ${err.message}`, err.stack);
+  res.status(500).json({ message: "Internal server error", error: err.message });
 });
 
 // Start Server

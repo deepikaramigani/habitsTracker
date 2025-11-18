@@ -1,6 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { fetchHabits, createHabit, deleteHabit } from './api'
 import HabitCard from './components/HabitCard'
+import RewardsPage from './components/RewardsPage'
+import Insights from './components/Insights'
+import RemindersPage from './components/RemindersPage'
+import ChallengesPage from './components/ChallengesPage'
+import Charts from './components/Charts'
 import dayjs from 'dayjs'
 
 export default function App() {
@@ -8,7 +13,10 @@ export default function App() {
   const [name, setName] = useState('')
   const [category, setCategory] = useState('')
   const [priority, setPriority] = useState(2)
+  const [goalType, setGoalType] = useState('daily')
+  const [goalValue, setGoalValue] = useState(1)
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState('habits') // 'habits' or 'rewards'
 
   // temporary fixed userId
   const userId = "000000000000000000000000"
@@ -35,26 +43,114 @@ export default function App() {
       userId,
       name,
       category,
-      priority,
+      priority: parseInt(priority, 10),
+      goal: {
+        type: goalType,
+        value: parseInt(goalValue, 10)
+      },
       startDate: dayjs().toDate()
     }
 
-    await createHabit(payload)
-    setName("")
-    setCategory("")
-    setPriority(2)
-    load()
+    try {
+      const res = await createHabit(payload)
+      console.log('[App] Habit created successfully:', res.data)
+      setName("")
+      setCategory("")
+      setPriority(2)
+      load()
+    } catch (err) {
+      console.error('[App] Error creating habit:', err.response?.data || err.message)
+      alert('Failed to add habit: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   const handleDelete = async (id) => {
-    await deleteHabit(id)
-    load()
+    try {
+      await deleteHabit(id)
+      load()
+    } catch (err) {
+      console.error('[App] Error deleting habit:', err.response?.data || err.message)
+      alert('Failed to delete habit: ' + (err.response?.data?.message || err.message))
+    }
   }
 
   return (
     <div className="p-6 max-w-3xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 text-center">Habit Tracker</h1>
 
+      {/* Navigation Tabs */}
+      <div className="flex gap-2 mb-6 justify-center">
+        <button
+          onClick={() => setPage('habits')}
+          className={`px-4 py-2 rounded-lg font-semibold transition ${
+            page === 'habits'
+              ? 'bg-sky-500 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          📋 Habits
+        </button>
+        <button
+          onClick={() => setPage('rewards')}
+          className={`px-4 py-2 rounded-lg font-semibold transition ${
+            page === 'rewards'
+              ? 'bg-purple-500 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          🎁 Rewards
+        </button>
+        <button
+          onClick={() => setPage('insights')}
+          className={`px-4 py-2 rounded-lg font-semibold transition ${
+            page === 'insights'
+              ? 'bg-emerald-500 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          📊 Insights
+        </button>
+        <button
+          onClick={() => setPage('reminders')}
+          className={`px-4 py-2 rounded-lg font-semibold transition ${
+            page === 'reminders'
+              ? 'bg-indigo-500 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          ⏰ Reminders
+        </button>
+        <button
+          onClick={() => setPage('challenges')}
+          className={`px-4 py-2 rounded-lg font-semibold transition ${
+            page === 'challenges'
+              ? 'bg-rose-500 text-white'
+              : 'bg-slate-200 text-slate-700 hover:bg-slate-300'
+          }`}
+        >
+          🏁 Challenges
+        </button>
+      </div>
+
+      {/* Rewards Page */}
+      {page === 'rewards' && <RewardsPage userId={userId} />}
+
+      {page === 'insights' && <Insights userId={userId} />}
+
+      {page === 'reminders' && <RemindersPage userId={userId} habits={habits} />}
+
+      {page === 'challenges' && <ChallengesPage userId={userId} />}
+
+      {/* Show charts section under habits for quick preview of first habit */}
+      {page === 'habits' && habits.length > 0 && (
+        <div className="mt-6">
+          <Charts habitId={habits[0]._id} range={30} />
+        </div>
+      )}
+
+      {/* Habits Page */}
+      {page === 'habits' && (
+        <>
       {/* Add Habit Form */}
       <form
         onSubmit={handleAdd}
@@ -75,6 +171,25 @@ export default function App() {
           onChange={(e) => setCategory(e.target.value)}
           className="border p-2 rounded"
         />
+
+        <div className="flex gap-2">
+          <select
+            value={goalType}
+            onChange={(e) => setGoalType(e.target.value)}
+            className="border p-2 rounded flex-1"
+          >
+            <option value="daily">Daily</option>
+            <option value="timesPerWeek">Times / Week</option>
+          </select>
+          <input
+            type="number"
+            min={1}
+            value={goalValue}
+            onChange={(e) => setGoalValue(e.target.value)}
+            className="border p-2 rounded w-28"
+            title="Goal value"
+          />
+        </div>
 
         <select
           value={priority}
@@ -110,6 +225,8 @@ export default function App() {
             />
           ))}
         </div>
+      )}
+        </>
       )}
     </div>
   )
